@@ -1,7 +1,7 @@
 PODS:
-  - Nimble (8.1.2)
-  - Quick (3.0.0)
-  - Sparkle (1.24.0)
+  - Nimble (10.0.0)
+  - Quick (5.0.1)
+  - Sparkle (2.8.0)
 
 DEPENDENCIES:
   - Nimble
@@ -15,10 +15,10 @@ SPEC REPOS:
     - Sparkle
 
 SPEC CHECKSUMS:
-  Nimble: 3864815b4703c7ebffba875973c70e854489fbae
-  Quick: 6d9559f40647bc4d510103842ef2fdd882d753e2
-  Sparkle: 270cd27377bf04e9c128af06e3a22d0f572d6ee3
+  Nimble: 5316ef81a170ce87baf72dd961f22f89a602ff84
+  Quick: 749aa754fd1e7d984f2000fe051e18a3a9809179
+  Sparkle: 16aaef9876ab6b3d49633d26e8e5b77e0d52b0e2
 
-PODFILE CHECKSUM: dc28f491260ac536f53535d24f79b53d40aaad9b
+PODFILE CHECKSUM: 045068e50176b47c048bd6661f67e4622497539d
 
-COCOAPODS: 1.10.0
+COCOAPODS: 1.16.2

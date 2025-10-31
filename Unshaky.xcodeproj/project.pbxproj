@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 51;
+	objectVersion = 54;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -23,6 +23,7 @@
 		5BB68E1E21A3423300CAA4B4 /* ShakyPressPreventerSpec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BB68E1D21A3423300CAA4B4 /* ShakyPressPreventerSpec.swift */; };
 		5BCA730920F5B43300A1210E /* PreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BCA730820F5B43300A1210E /* PreferenceViewController.swift */; };
 		5BE661592283726B00B2A886 /* KeyboardLayouts.m in Sources */ = {isa = PBXBuildFile; fileRef = 5BE661582283726B00B2A886 /* KeyboardLayouts.m */; };
+		5BF000012A000001000000A1 /* PerformanceOptimizations.m in Sources */ = {isa = PBXBuildFile; fileRef = 5BF000002A000001000000A0 /* PerformanceOptimizations.m */; };
 		5DDFCCEF1C53414916147497 /* Pods_UnshakyTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F4C30C977EAB3365268D080 /* Pods_UnshakyTests.framework */; };
 		8A8865A9A724FA97AF9FE132 /* Pods_Unshaky.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3210D714B742F537687136CC /* Pods_Unshaky.framework */; };
 /* End PBXBuildFile section */
@@ -144,6 +145,8 @@
 		5BD2D6F022B81CFC00FD5E52 /* pt-BR */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "pt-BR"; path = "pt-BR.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		5BE661572283726B00B2A886 /* KeyboardLayouts.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = KeyboardLayouts.h; sourceTree = "<group>"; };
 		5BE661582283726B00B2A886 /* KeyboardLayouts.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = KeyboardLayouts.m; sourceTree = "<group>"; };
+		5BF000002A000001000000A0 /* PerformanceOptimizations.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = PerformanceOptimizations.m; sourceTree = "<group>"; };
+		5BF000012A000001000000A2 /* PerformanceOptimizations.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PerformanceOptimizations.h; sourceTree = "<group>"; };
 		5BF4F6FC226D4296009F53B0 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Debug.strings"; sourceTree = "<group>"; };
 		5BF4F6FD226D429A009F53B0 /* zh-HK */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-HK"; path = "zh-HK.lproj/Debug.strings"; sourceTree = "<group>"; };
 		5BF4F6FE226D429C009F53B0 /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Debug.strings"; sourceTree = "<group>"; };
@@ -225,6 +228,8 @@
 				5B43614C223B140400B6E9E0 /* DebugViewController.m */,
 				5BE661572283726B00B2A886 /* KeyboardLayouts.h */,
 				5BE661582283726B00B2A886 /* KeyboardLayouts.m */,
+				5BF000012A000001000000A2 /* PerformanceOptimizations.h */,
+				5BF000002A000001000000A0 /* PerformanceOptimizations.m */,
 			);
 			path = Unshaky;
 			sourceTree = "<group>";
@@ -424,10 +429,12 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/$(FRAMEWORKS_FOLDER_PATH)/Sparkle.framework/Versions/A/Resources/AutoUpdate.app",
+				"$(BUILT_PRODUCTS_DIR)/$(FRAMEWORKS_FOLDER_PATH)/Sparkle.framework/Versions/A",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "LOCATION=\"${BUILT_PRODUCTS_DIR}\"/\"${FRAMEWORKS_FOLDER_PATH}\"\n\n# By default, use the configured code signing identity for the project/target\nIDENTITY=\"${CODE_SIGN_IDENTITY}\"\nIDENTITY=\"Apple Development: Xinhong Liu (32BU6UVQ76)\"\nif [ \"$IDENTITY\" == \"\" ]\nthen\n# If a code signing identity is not specified, use ad hoc signing\nIDENTITY=\"-\"\nfi\nif [ \"$DONT_CODE_SIGN\" == \"YES\" ]\nthen\n# If a code signing identity is not specified, use ad hoc signing\nIDENTITY=\"-\"\nfi\ncodesign --verbose --force --deep -o runtime --sign \"$IDENTITY\" \"$LOCATION/Sparkle.framework/Versions/A/Resources/AutoUpdate.app\"\ncodesign --verbose --force -o runtime --sign \"$IDENTITY\" \"$LOCATION/Sparkle.framework/Versions/A\"\n";
+			shellScript = "LOCATION=\"${BUILT_PRODUCTS_DIR}\"/\"${FRAMEWORKS_FOLDER_PATH}\"\n\n# By default, use the configured code signing identity for the project/target\nIDENTITY=\"${CODE_SIGN_IDENTITY}\"\n# Use ad hoc signing for development builds\nif [ \"$IDENTITY\" == \"\" ] || [ \"$IDENTITY\" == \"-\" ]\nthen\n# If a code signing identity is not specified, use ad hoc signing\nIDENTITY=\"-\"\nfi\nif [ \"$DONT_CODE_SIGN\" == \"YES\" ]\nthen\n# If a code signing identity is not specified, use ad hoc signing\nIDENTITY=\"-\"\nfi\necho \"Using code signing identity: $IDENTITY\"\ncodesign --verbose --force --deep -o runtime --sign \"$IDENTITY\" \"$LOCATION/Sparkle.framework/Versions/A/Resources/AutoUpdate.app\" || echo \"Warning: Failed to sign AutoUpdate.app\"\ncodesign --verbose --force -o runtime --sign \"$IDENTITY\" \"$LOCATION/Sparkle.framework/Versions/A\" || echo \"Warning: Failed to sign Sparkle.framework\"\n";
 		};
 		63A7B0E478BADB58754CFBEC /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -499,6 +506,7 @@
 				5B50712521839D5400A65B81 /* ExportImportViewController.swift in Sources */,
 				5B3168EC20DB9CF100185DE5 /* AppDelegate.swift in Sources */,
 				5BE661592283726B00B2A886 /* KeyboardLayouts.m in Sources */,
+				5BF000012A000001000000A1 /* PerformanceOptimizations.m in Sources */,
 				5B93DF61230CC0340085CB9F /* Preference.swift in Sources */,
 				5B56C1FE2274510000F3383F /* CounterViewControler.swift in Sources */,
 			);
@@ -781,18 +789,19 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "Mac Developer";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 48;
 				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = 92D95TWTWQ;
+				DEVELOPMENT_TEAM = MAW267F5JJ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Unshaky/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 10.12;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nestederror.Unshaky;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -810,18 +819,19 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "Mac Developer";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 48;
 				DEFINES_MODULE = YES;
-				DEVELOPMENT_TEAM = 92D95TWTWQ;
+				DEVELOPMENT_TEAM = MAW267F5JJ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Unshaky/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 10.12;
+				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				MARKETING_VERSION = 0.7.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nestederror.Unshaky;
 				PRODUCT_NAME = "$(TARGET_NAME)";
