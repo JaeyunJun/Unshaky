@@ -8,6 +8,7 @@
 
 #import "ShakyPressPreventer.h"
 #import "KeyboardLayouts.h"
+#import "PerformanceOptimizations.h"
 
 #define AUTO_EXPANSION_IGNORE_THRESHOLD 5
 #define KEYCODE_SPACE 49
@@ -150,10 +151,10 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
     // keyboard type, used if user specify ignore-external or ignore-internal
     if (ignoreExternalKeyboard || ignoreInternalKeyboard) {
         int64_t keyboardType = CGEventGetIntegerValueField(event, kCGKeyboardEventKeyboardType);
-        // 58: seems to be the value for pre-2018 models
-        // 59: MacBook Pro (15-inch, 2018) https://github.com/aahung/Unshaky/issues/40
-        if (ignoreExternalKeyboard && keyboardType != 58 && keyboardType != 59) return event;
-        if (ignoreInternalKeyboard && (keyboardType == 58 || keyboardType == 59)) return event;
+        // Use optimized keyboard type detection
+        BOOL isInternalKeyboard = [KeyboardTypeDetector isInternalKeyboard:keyboardType];
+        if (ignoreExternalKeyboard && !isInternalKeyboard) return event;
+        if (ignoreInternalKeyboard && isInternalKeyboard) return event;
     }
 
     // The incoming keycode.
@@ -166,16 +167,20 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
     CGEventFlags eventFlagsAboutModifierKeys = (kCGEventFlagMaskShift | kCGEventFlagMaskControl |
                                                 kCGEventFlagMaskAlternate | kCGEventFlagMaskCommand |
                                                 kCGEventFlagMaskSecondaryFn) & CGEventGetFlags(event);
-    double currentTimestamp = [[NSDate date] timeIntervalSince1970];
+    
+    // Use optimized timestamp cache for better performance
+    double currentTimestamp = [[TimestampCache sharedInstance] getCurrentTimestamp];
 
-    if (_debugViewController != nil) {
+    // Cache debug controller check for performance
+    DebugViewController *debugController = _debugViewController;
+    if (debugController != nil) {
         int64_t keyboardType = CGEventGetIntegerValueField(event, kCGKeyboardEventKeyboardType);
-        [_debugViewController appendEventToDebugTextview:currentTimestamp
-                                            keyboardType:keyboardType
-                                                 keyCode:keyCode
-                                               eventType:eventType
-                             eventFlagsAboutModifierKeys:eventFlagsAboutModifierKeys
-                                                   delay:keyDelays[keyCode]];
+        [debugController appendEventToDebugTextview:currentTimestamp
+                                       keyboardType:keyboardType
+                                            keyCode:keyCode
+                                          eventType:eventType
+                        eventFlagsAboutModifierKeys:eventFlagsAboutModifierKeys
+                                              delay:keyDelays[keyCode]];
     }
 
     if (lastPressedTimestamps[keyCode] != 0.0) {
@@ -195,15 +200,16 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
          not CMD+<any other key>, or <any other modifier key>+Space.*/
         // So here we allow one double-press to slip away
 
-        // reset allowance to 1
-        if (keyCode == KEYCODE_SPACE && eventFlagsAboutModifierKeys && 1000 * (currentTimestamp - lastPressedTimestamps[keyCode]) >= keyDelays[keyCode]) {
+        // reset allowance to 1 - improved CMD+Space detection
+        if (keyCode == KEYCODE_SPACE && (eventFlagsAboutModifierKeys & kCGEventFlagMaskCommand) && 
+            1000 * (currentTimestamp - lastPressedTimestamps[keyCode]) >= keyDelays[keyCode]) {
             cmdSpaceAllowance = YES;
         }
 
         if (dismissNextEvent[keyCode]) {
             // dismiss the corresponding keyup event
-            if (_debugViewController != nil) {
-                [_debugViewController appendDismissed];
+            if (debugController != nil) {
+                [debugController appendDismissed];
             }
 
             dismissNextEvent[keyCode] = NO;
@@ -217,14 +223,16 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
             && (msElapsed = 1000 * (currentTimestamp - lastPressedTimestamps[keyCode])) > AUTO_EXPANSION_IGNORE_THRESHOLD
             && msElapsed < keyDelays[keyCode]) {
 
-            // let it slip away if allowance is 1 for CMD+SPACE
-            if (keyCode == KEYCODE_SPACE && lastEventFlagsAboutModifierKeysForSpace &&
-                eventFlagsAboutModifierKeys && workaroundForCmdSpace && cmdSpaceAllowance) {
+            // let it slip away if allowance is 1 for CMD+SPACE - improved detection
+            if (keyCode == KEYCODE_SPACE && 
+                (lastEventFlagsAboutModifierKeysForSpace & kCGEventFlagMaskCommand) &&
+                (eventFlagsAboutModifierKeys & kCGEventFlagMaskCommand) && 
+                workaroundForCmdSpace && cmdSpaceAllowance) {
                 cmdSpaceAllowance = NO;
             } else {
                 // dismiss the keydown event if it follows keyup event too soon
-                if (_debugViewController != nil) {
-                    [_debugViewController appendDismissed];
+                if (debugController != nil) {
+                    [debugController appendDismissed];
                 }
 
                 if (statisticsHandler != nil && !statisticsDisabled) {
@@ -234,7 +242,9 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
                 return nil;
             }
         }
-    } else if (keyCode == KEYCODE_SPACE && eventFlagsAboutModifierKeys) cmdSpaceAllowance = YES;
+    } else if (keyCode == KEYCODE_SPACE && (eventFlagsAboutModifierKeys & kCGEventFlagMaskCommand)) {
+        cmdSpaceAllowance = YES;
+    }
 
     lastPressedTimestamps[keyCode] = currentTimestamp;
     lastPressedEventTypes[keyCode] = eventType;

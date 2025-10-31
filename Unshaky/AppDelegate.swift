@@ -88,15 +88,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Basic
     //
     func setup() {
-        // this following lines will add Unshaky.app to privacy->accessibility panel, unchecked
+        // Check for both Accessibility and Input Monitoring permissions (required for macOS 10.15.6+)
         let checkOptPrompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as NSString
         let accessEnabled = AXIsProcessTrustedWithOptions([checkOptPrompt: false] as CFDictionary?)
+        
+        // Check Input Monitoring permission for newer macOS versions
+        var inputMonitoringEnabled = true
+        if #available(macOS 10.15, *) {
+            // For macOS 10.15.6 and later, Input Monitoring permission is also required
+            // We'll attempt to setup the event tap and see if it works
+            inputMonitoringEnabled = shakyPressPreventer.setupEventTap()
+        }
 
-        if (!shakyPressPreventer.setupEventTap() || !accessEnabled) {
+        if (!inputMonitoringEnabled || !accessEnabled) {
             let alert = NSAlert()
             alert.messageText = NSLocalizedString("Accessibility Help", comment: "")
-            alert.runModal()
-            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+            alert.informativeText = NSLocalizedString("Unshaky requires both Accessibility and Input Monitoring permissions to function properly.", comment: "")
+            alert.addButton(withTitle: NSLocalizedString("Open System Preferences", comment: ""))
+            alert.addButton(withTitle: NSLocalizedString("Quit", comment: ""))
+            
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                // Open both privacy panels
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                if #available(macOS 10.15, *) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!)
+                    }
+                }
+            }
             NSApplication.shared.terminate(self)
         }
     }
@@ -106,7 +126,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setup()
     }
 
+    private var lastRecoveryCheck: TimeInterval = 0
+    private let recoveryCheckInterval: TimeInterval = 5.0 // Check every 5 seconds max
+    
     func checkAndRecoverIfNeeded() {
+        let now = Date().timeIntervalSince1970
+        if now - lastRecoveryCheck < recoveryCheckInterval {
+            return // Skip frequent checks
+        }
+        lastRecoveryCheck = now
+        
         if !shakyPressPreventer.eventTapEnabled() {
             print("Event tap is not enable, try to recover.")
             recover()

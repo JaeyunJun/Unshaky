@@ -46,9 +46,18 @@
     NSDictionary<NSNumber *, NSString *> *keyCodeToString = [[KeyboardLayouts shared] keyCodeToString];
     NSString *keyDescription = keyCodeToString[[[NSNumber alloc] initWithInt:keyCode]];
     if (keyDescription == nil) keyDescription = @"Unknown";
-    NSString *eventString = [NSString stringWithFormat:@"%f Key(%3lld|%3d|%14s|%10llu|%3d) E(%u)",
-                             timestamp, keyboardType, keyCode, [keyDescription UTF8String],
-                             eventFlagsAboutModifierKeys, delay, eventType];
+    
+    // Add keyboard type description for better debugging
+    NSString *keyboardTypeDesc = @"Unknown";
+    if (keyboardType >= 58 && keyboardType <= 70) {
+        keyboardTypeDesc = @"Internal";
+    } else if ((keyboardType >= 0 && keyboardType <= 57) || (keyboardType >= 71 && keyboardType <= 200)) {
+        keyboardTypeDesc = @"External/BT";
+    }
+    
+    NSString *eventString = [NSString stringWithFormat:@"%f Key(%3lld|%9s|%3d|%14s|%10llu|%3d) E(%u)",
+                             timestamp, keyboardType, [keyboardTypeDesc UTF8String], keyCode, 
+                             [keyDescription UTF8String], eventFlagsAboutModifierKeys, delay, eventType];
     [self appendToDebugTextView:[@"\n" stringByAppendingString:eventString]];
 }
 
