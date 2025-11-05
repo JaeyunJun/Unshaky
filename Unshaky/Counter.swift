@@ -36,13 +36,25 @@ class Counter: NSObject {
 //        }
     }
 
+    private var _cachedKeyCounters: [KeyCounter]?
+    private var _cacheInvalidated = true
+    
     var keyCounters: [KeyCounter] {
         get {
-            var counters = [KeyCounter]()
-            for i in 0..<nVirtualKey {
-                counters.append(KeyCounter(keyCode: i, count: dismissCountIndividual[i]))
+            if _cacheInvalidated || _cachedKeyCounters == nil {
+                var counters = [KeyCounter]()
+                counters.reserveCapacity(nVirtualKey)
+                
+                for i in 0..<nVirtualKey {
+                    let count = dismissCountIndividual[i]
+                    if count > 0 { // Only include keys with actual counts
+                        counters.append(KeyCounter(keyCode: i, count: count))
+                    }
+                }
+                _cachedKeyCounters = counters.sorted(by: { $0.count > $1.count })
+                _cacheInvalidated = false
             }
-            return counters.sorted(by: { $0.count > $1.count })
+            return _cachedKeyCounters!
         }
     }
 
@@ -54,10 +66,33 @@ class Counter: NSObject {
         notifyObservers()
     }
 
+    private var saveTimer: Timer?
+    private var needsSave = false
+    
     func increment(keyCode: Int32) {
         dismissCount += 1
         dismissCountIndividual[Int(keyCode)] += 1
-        notifyObservers()
+        needsSave = true
+        
+        // Batch notifications to reduce UI updates
+        if saveTimer == nil {
+            saveTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
+                self?.notifyObservers()
+                self?.saveTimer = nil
+            }
+        }
+        
+        // Batch saves to reduce disk I/O
+        scheduleSave()
+    }
+    
+    private func scheduleSave() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            if self?.needsSave == true {
+                self?.save()
+                self?.needsSave = false
+            }
+        }
     }
 
     func reset() {
@@ -73,6 +108,7 @@ class Counter: NSObject {
     }
 
     func notifyObservers() {
+        _cacheInvalidated = true
         NotificationCenter.default.post(name: .counterUpdate, object: nil)
     }
 }

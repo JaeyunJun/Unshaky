@@ -37,8 +37,8 @@
 - (double)getCurrentTimestamp {
     uint64_t currentMachTime = mach_absolute_time();
     
-    // Only update timestamp if significant time has passed (> 1ms)
-    if (currentMachTime - _lastMachTime > 1000000) { // ~1ms in nanoseconds
+    // Increase cache duration to 5ms for better energy efficiency
+    if (currentMachTime - _lastMachTime > 5000000) { // ~5ms in nanoseconds
         _cachedTimestamp = currentMachTime * _machTimeToSeconds;
         _lastMachTime = currentMachTime;
     }

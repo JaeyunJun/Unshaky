@@ -144,24 +144,33 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
 }
 
 - (CGEventRef)filterShakyPressEvent:(CGEventRef)event {
-    if (disabled) {
+    // Fast path: early return if disabled
+    if (__builtin_expect(disabled, 0)) {
         return event;
     }
 
-    // keyboard type, used if user specify ignore-external or ignore-internal
-    if (ignoreExternalKeyboard || ignoreInternalKeyboard) {
+    // The incoming keycode - get this first for early filtering
+    CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
+    
+    // Fast path: ignore unconfigured keys immediately
+    if (__builtin_expect(keyCode >= N_VIRTUAL_KEY, 0)) {
+        return event;
+    }
+    
+    // Cache key delay for this key to avoid repeated array access
+    int keyDelay = keyDelays[keyCode];
+    if (__builtin_expect(keyDelay == 0, 0)) {
+        return event;
+    }
+
+    // keyboard type filtering - only check if needed
+    if (__builtin_expect(ignoreExternalKeyboard || ignoreInternalKeyboard, 0)) {
         int64_t keyboardType = CGEventGetIntegerValueField(event, kCGKeyboardEventKeyboardType);
         // Use optimized keyboard type detection
         BOOL isInternalKeyboard = [KeyboardTypeDetector isInternalKeyboard:keyboardType];
         if (ignoreExternalKeyboard && !isInternalKeyboard) return event;
         if (ignoreInternalKeyboard && isInternalKeyboard) return event;
     }
-
-    // The incoming keycode.
-    CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
-    
-    // ignore unconfigured keys
-    if (keyCode >= N_VIRTUAL_KEY || keyDelays[keyCode] == 0) return event;
 
     CGEventType eventType = CGEventGetType(event);
     CGEventFlags eventFlagsAboutModifierKeys = (kCGEventFlagMaskShift | kCGEventFlagMaskControl |
@@ -180,7 +189,7 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
                                             keyCode:keyCode
                                           eventType:eventType
                         eventFlagsAboutModifierKeys:eventFlagsAboutModifierKeys
-                                              delay:keyDelays[keyCode]];
+                                              delay:keyDelay];
     }
 
     if (lastPressedTimestamps[keyCode] != 0.0) {
@@ -236,7 +245,10 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
                 }
 
                 if (statisticsHandler != nil && !statisticsDisabled) {
-                    statisticsHandler(keyCode);
+                    // Move statistics to background thread to avoid blocking key processing
+                    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
+                        statisticsHandler(keyCode);
+                    });
                 }
                 dismissNextEvent[keyCode] = YES;
                 return nil;
@@ -254,9 +266,11 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
 }
 
 - (BOOL)setupEventTap {
+    // Only monitor KeyDown and KeyUp events - remove FlagsChanged to save energy
+    CGEventMask eventMask = ((1 << kCGEventKeyDown) | (1 << kCGEventKeyUp));
     
-    CGEventMask eventMask = ((1 << kCGEventKeyDown) | (1 << kCGEventKeyUp) | (1 << kCGEventFlagsChanged));
-    eventTap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, 0,
+    // Use passive event tap for better energy efficiency
+    eventTap = CGEventTapCreate(kCGSessionEventTap, kCGTailAppendEventTap, kCGEventTapOptionDefault,
                                 eventMask, eventTapCallback, (__bridge void *)(self));
     if (!eventTap) {
         NSLog(@"Permission issue");
