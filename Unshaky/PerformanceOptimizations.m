@@ -37,8 +37,9 @@
 - (double)getCurrentTimestamp {
     uint64_t currentMachTime = mach_absolute_time();
     
-    // Increase cache duration to 5ms for better energy efficiency
-    if (currentMachTime - _lastMachTime > 5000000) { // ~5ms in nanoseconds
+    // Very conservative cache duration of 2ms - maintains accuracy for key debouncing
+    // Key debouncing requires precise timing, so we minimize caching
+    if (currentMachTime - _lastMachTime > 2000000) { // ~2ms in nanoseconds
         _cachedTimestamp = currentMachTime * _machTimeToSeconds;
         _lastMachTime = currentMachTime;
     }

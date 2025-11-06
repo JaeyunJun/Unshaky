@@ -149,6 +149,8 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
         return event;
     }
 
+    // Direct processing - no unnecessary optimizations
+
     // The incoming keycode - get this first for early filtering
     CGKeyCode keyCode = (CGKeyCode)CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
     
@@ -177,7 +179,7 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
                                                 kCGEventFlagMaskAlternate | kCGEventFlagMaskCommand |
                                                 kCGEventFlagMaskSecondaryFn) & CGEventGetFlags(event);
     
-    // Use optimized timestamp cache for better performance
+    // Use optimized timestamp cache for better performance - always use cache
     double currentTimestamp = [[TimestampCache sharedInstance] getCurrentTimestamp];
 
     // Cache debug controller check for performance
@@ -282,12 +284,16 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
     CGEventTapEnable(eventTap, true);
     CFRelease(runLoopSource);
 
+    // No sleep assertion needed - key events are processed instantly
+
     return YES;
 }
 
 - (void)removeEventTap {
     if (eventTap == NULL) return;
     @try {
+        // No energy management resources to release
+        
         CFMachPortInvalidate(eventTap);
         CFRelease(eventTap);
         eventTap = NULL;
