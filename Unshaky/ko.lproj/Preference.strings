@@ -54,6 +54,12 @@
 /* Class = "NSButtonCell"; title = "Ignore external keyboard (experimental)"; ObjectID = "dE9-oM-Tqa"; */
 "dE9-oM-Tqa.title" = "외부 키보드 제외 (실험기능)";
 
+/* Class = "NSButtonCell"; title = "Ignore internal keyboard (experimental)"; ObjectID = "i3V-xH-iv6"; */
+"i3V-xH-iv6.title" = "내장 키보드 제외 (실험기능)";
+
+/* Class = "NSButtonCell"; title = "Disable statistics"; ObjectID = "LSi-xf-baI"; */
+"LSi-xf-baI.title" = "통계 비활성화";
+
 /* Class = "NSButtonCell"; title = "Set"; ObjectID = "juW-NR-znR"; */
 "juW-NR-znR.title" = "설정";
 

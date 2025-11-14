@@ -10,7 +10,6 @@
 #import "KeyboardLayouts.h"
 #import "PerformanceOptimizations.h"
 
-#define AUTO_EXPANSION_IGNORE_THRESHOLD 5
 #define KEYCODE_SPACE 49
 
 @implementation ShakyPressPreventer {
@@ -231,8 +230,7 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
         float msElapsed;
         if (eventType == kCGEventKeyDown
             && lastPressedEventTypes[keyCode] == kCGEventKeyUp
-            && (msElapsed = 1000 * (currentTimestamp - lastPressedTimestamps[keyCode])) > AUTO_EXPANSION_IGNORE_THRESHOLD
-            && msElapsed < keyDelays[keyCode]) {
+            && (msElapsed = 1000 * (currentTimestamp - lastPressedTimestamps[keyCode])) < keyDelays[keyCode]) {
 
             // let it slip away if allowance is 1 for CMD+SPACE - improved detection
             if (keyCode == KEYCODE_SPACE && 

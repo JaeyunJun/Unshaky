@@ -43,16 +43,25 @@
                          eventType:(CGEventType)eventType
        eventFlagsAboutModifierKeys:(CGEventFlags)eventFlagsAboutModifierKeys
                              delay:(int)delay {
+    // Cache keyboard type descriptions to avoid repeated string allocations
+    static NSString *internalDesc = nil;
+    static NSString *externalDesc = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        internalDesc = @"Internal";
+        externalDesc = @"External/BT";
+    });
+    
     NSDictionary<NSNumber *, NSString *> *keyCodeToString = [[KeyboardLayouts shared] keyCodeToString];
-    NSString *keyDescription = keyCodeToString[[[NSNumber alloc] initWithInt:keyCode]];
+    NSString *keyDescription = keyCodeToString[@(keyCode)];
     if (keyDescription == nil) keyDescription = @"Unknown";
     
-    // Add keyboard type description for better debugging
+    // Use cached keyboard type descriptions
     NSString *keyboardTypeDesc = @"Unknown";
     if (keyboardType >= 58 && keyboardType <= 70) {
-        keyboardTypeDesc = @"Internal";
+        keyboardTypeDesc = internalDesc;
     } else if ((keyboardType >= 0 && keyboardType <= 57) || (keyboardType >= 71 && keyboardType <= 200)) {
-        keyboardTypeDesc = @"External/BT";
+        keyboardTypeDesc = externalDesc;
     }
     
     NSString *eventString = [NSString stringWithFormat:@"%f Key(%3lld|%9s|%3d|%14s|%10llu|%3d) E(%u)",

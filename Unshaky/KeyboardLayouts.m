@@ -10,6 +10,8 @@
 
 @implementation KeyboardLayouts {
     NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
+    // Cache for merged keyboard layouts to avoid repeated dictionary operations
+    NSMutableDictionary<NSString *, NSDictionary<NSNumber *, NSString *> *> *_layoutCache;
 }
 
 + (instancetype)shared {
@@ -36,6 +38,7 @@
     self = [super init];
     if (self) {
         _keyCodeToString = KeyboardLayouts.US;
+        _layoutCache = [NSMutableDictionary dictionary];
     }
     return self;
 }
@@ -45,6 +48,13 @@
 }
 
 - (void)setKeyboardLayout:(NSString *)keyboardLayout {
+    // Check cache first to avoid repeated dictionary operations
+    NSDictionary<NSNumber *, NSString *> *cached = _layoutCache[keyboardLayout];
+    if (cached != nil) {
+        _keyCodeToString = cached;
+        return;
+    }
+    
     NSMutableDictionary<NSNumber *, NSString *> *keyCodeToString = [KeyboardLayouts.US mutableCopy];
 
     NSDictionary<NSNumber *, NSString *> *overwrite;
@@ -63,6 +73,9 @@
         }
     }
     _keyCodeToString = [[NSDictionary alloc] initWithDictionary:keyCodeToString];
+    
+    // Cache the result for future use
+    _layoutCache[keyboardLayout] = _keyCodeToString;
 }
 
 +(NSDictionary<NSNumber *, NSString *> *)US {

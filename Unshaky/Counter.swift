@@ -42,16 +42,11 @@ class Counter: NSObject {
     var keyCounters: [KeyCounter] {
         get {
             if _cacheInvalidated || _cachedKeyCounters == nil {
-                var counters = [KeyCounter]()
-                counters.reserveCapacity(nVirtualKey)
-                
-                for i in 0..<nVirtualKey {
-                    let count = dismissCountIndividual[i]
-                    if count > 0 { // Only include keys with actual counts
-                        counters.append(KeyCounter(keyCode: i, count: count))
-                    }
-                }
-                _cachedKeyCounters = counters.sorted(by: { $0.count > $1.count })
+                // Pre-filter and sort in one pass for better performance
+                _cachedKeyCounters = dismissCountIndividual.enumerated()
+                    .filter { $0.element > 0 }
+                    .map { KeyCounter(keyCode: $0.offset, count: $0.element) }
+                    .sorted { $0.count > $1.count }
                 _cacheInvalidated = false
             }
             return _cachedKeyCounters!
@@ -66,6 +61,7 @@ class Counter: NSObject {
         notifyObservers()
     }
 
+    private var notificationTimer: Timer?
     private var saveTimer: Timer?
     private var needsSave = false
     
@@ -75,23 +71,26 @@ class Counter: NSObject {
         needsSave = true
         
         // Batch notifications to reduce UI updates
-        if saveTimer == nil {
-            saveTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
+        if notificationTimer == nil {
+            notificationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
                 self?.notifyObservers()
-                self?.saveTimer = nil
+                self?.notificationTimer = nil
             }
         }
         
-        // Batch saves to reduce disk I/O
+        // Batch saves to reduce disk I/O - reuse timer instead of creating new ones
         scheduleSave()
     }
     
     private func scheduleSave() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+        // Cancel existing timer and create new one to reset the 10 second countdown
+        saveTimer?.invalidate()
+        saveTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
             if self?.needsSave == true {
                 self?.save()
                 self?.needsSave = false
             }
+            self?.saveTimer = nil
         }
     }
 
@@ -104,7 +103,7 @@ class Counter: NSObject {
     func save() {
         defaults.set(dismissCount, forKey: Counter.TOTAL_COUNT_KEY)
         defaults.set(dismissCountIndividual, forKey: Counter.INDIVIDUAL_COUNT_KEY)
-        defaults.synchronize()
+        // synchronize() is deprecated and automatic since macOS 10.14
     }
 
     func notifyObservers() {
