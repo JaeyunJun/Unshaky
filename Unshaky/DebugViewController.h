@@ -20,6 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
                              delay:(int)delay;
 
 - (void)appendDismissed;
+- (void)showConnectedKeyboards;
 
 @end
 

@@ -9,6 +9,7 @@
 #import "DebugViewController.h"
 #import "ShakyPressPreventer.h"
 #import "KeyboardLayouts.h"
+#import "PerformanceOptimizations.h"
 
 @interface DebugViewController ()
 
@@ -82,6 +83,41 @@
 
 - (IBAction)clearClicked:(id)sender {
     self.textView.string = @"";
+}
+
+- (void)showConnectedKeyboards {
+    NSArray<NSDictionary *> *keyboards = [[KeyboardTypeDetector sharedInstance] getAllConnectedKeyboards];
+    
+    NSMutableString *info = [NSMutableString stringWithString:@"\n========== Connected Keyboards ==========\n"];
+    
+    if (keyboards.count == 0) {
+        [info appendString:@"No keyboards detected. Refreshing...\n"];
+        [[KeyboardTypeDetector sharedInstance] refreshKeyboardList];
+        
+        // Try again after a short delay
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self showConnectedKeyboards];
+        });
+        return;
+    }
+    
+    for (NSDictionary *keyboard in keyboards) {
+        NSString *name = keyboard[@"productName"];
+        NSString *transport = keyboard[@"transport"];
+        BOOL isBuiltIn = [keyboard[@"isBuiltIn"] boolValue];
+        NSNumber *vendorID = keyboard[@"vendorID"];
+        NSNumber *productID = keyboard[@"productID"];
+        
+        [info appendFormat:@"\n📱 %@\n", name];
+        [info appendFormat:@"   Type: %@\n", isBuiltIn ? @"Built-in (Internal)" : @"External"];
+        [info appendFormat:@"   Transport: %@\n", [transport length] > 0 ? transport : @"N/A"];
+        [info appendFormat:@"   Vendor ID: 0x%04X\n", [vendorID intValue]];
+        [info appendFormat:@"   Product ID: 0x%04X\n", [productID intValue]];
+    }
+    
+    [info appendString:@"\n=========================================\n"];
+    
+    [self appendToDebugTextView:info];
 }
 
 @end

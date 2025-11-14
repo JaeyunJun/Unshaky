@@ -34,6 +34,7 @@ typedef void (^Handler)(int);
 - (void)loadStatisticsDisabled;
 - (void)setDisabled:(BOOL)disabled;
 - (BOOL)isDisabled;
+- (void)updateMonitoringState;
 // This initWithKeyDelays:ignoreExternalKeyboard ...: is used for testing purpose
 - (instancetype)initWithKeyDelays:(int*)keyDelays_ ignoreExternalKeyboard:(BOOL)ignoreExternalKeyboard_ workaroundForCmdSpace:(BOOL)workaroundForCmdSpace_ aggressiveMode:(BOOL)aggressiveMode_;
 

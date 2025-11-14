@@ -119,6 +119,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             NSApplication.shared.terminate(self)
         }
+        
+        // Update monitoring state based on connected keyboards and settings
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.shakyPressPreventer.updateMonitoringState()
+        }
     }
 
     func recover() {
@@ -168,6 +173,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugWindow.contentView = debugViewController.view
         debugWindow.orderFrontRegardless()
         shakyPressPreventer.debugViewController = debugViewController
+        
+        // Show connected keyboards info when debug window opens
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            debugViewController.showConnectedKeyboards()
+        }
     }
     
     //

@@ -68,8 +68,26 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
         disabled = NO;
         lastPressedKey = 0;
         lastAnyKeyTimestamp = 0.0;
+        
+        // Listen for keyboard connection/disconnection events
+        [[NSNotificationCenter defaultCenter] addObserver:self 
+                                                 selector:@selector(keyboardConnectionChanged:) 
+                                                     name:@"keyboard-connected" 
+                                                   object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self 
+                                                 selector:@selector(keyboardConnectionChanged:) 
+                                                     name:@"keyboard-disconnected" 
+                                                   object:nil];
     }
     return self;
+}
+
+- (void)keyboardConnectionChanged:(NSNotification *)notification {
+    NSLog(@"[Unshaky] Keyboard connection changed, updating monitoring state");
+    // Wait a bit for the keyboard list to be refreshed
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [self updateMonitoringState];
+    });
 }
 
 // This initWithKeyDelays:ignoreExternalKeyboard: is used for testing purpose
@@ -122,11 +140,32 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
 - (void)loadIgnoreExternalKeyboard {
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
     ignoreExternalKeyboard = [defaults boolForKey:@"ignoreExternalKeyboard"]; // default No
+    [self updateMonitoringState];
 }
 
 - (void)loadIgnoreInternalKeyboard {
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
     ignoreInternalKeyboard = [defaults boolForKey:@"ignoreInternalKeyboard"]; // default No
+    [self updateMonitoringState];
+}
+
+- (void)updateMonitoringState {
+    // Refresh keyboard list to get current state
+    [[KeyboardTypeDetector sharedInstance] refreshKeyboardList];
+    
+    // Check if monitoring is needed
+    BOOL shouldMonitor = [[KeyboardTypeDetector sharedInstance] 
+                          shouldMonitorWithIgnoreInternal:ignoreInternalKeyboard 
+                          ignoreExternal:ignoreExternalKeyboard];
+    
+    // Enable or disable based on the result
+    if (!shouldMonitor && [self eventTapEnabled]) {
+        NSLog(@"[Unshaky] Disabling event tap - no keyboards to monitor");
+        [self removeEventTap];
+    } else if (shouldMonitor && ![self eventTapEnabled]) {
+        NSLog(@"[Unshaky] Enabling event tap - keyboards need monitoring");
+        [self setupEventTap];
+    }
 }
 
 - (void)loadWorkaroundForCmdSpace {
@@ -178,8 +217,8 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
     // keyboard type filtering - only check if needed
     if (__builtin_expect(ignoreExternalKeyboard || ignoreInternalKeyboard, 0)) {
         int64_t keyboardType = CGEventGetIntegerValueField(event, kCGKeyboardEventKeyboardType);
-        // Use optimized keyboard type detection
-        BOOL isInternalKeyboard = [KeyboardTypeDetector isInternalKeyboard:keyboardType];
+        // Use IOKit-based keyboard type detection for better accuracy
+        BOOL isInternalKeyboard = [[KeyboardTypeDetector sharedInstance] isInternalKeyboardWithIOKit:keyboardType];
         if (ignoreExternalKeyboard && !isInternalKeyboard) return event;
         if (ignoreInternalKeyboard && isInternalKeyboard) return event;
     }
@@ -269,7 +308,7 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
                 if (statisticsHandler != nil && !statisticsDisabled) {
                     // Move statistics to background thread to avoid blocking key processing
                     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-                        statisticsHandler(keyCode);
+                        self->statisticsHandler(keyCode);
                     });
                 }
                 dismissNextEvent[keyCode] = YES;
@@ -298,8 +337,9 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
     // Only monitor KeyDown and KeyUp events - remove FlagsChanged to save energy
     CGEventMask eventMask = ((1 << kCGEventKeyDown) | (1 << kCGEventKeyUp));
     
-    // Use passive event tap for better energy efficiency
-    eventTap = CGEventTapCreate(kCGSessionEventTap, kCGTailAppendEventTap, kCGEventTapOptionDefault,
+    // Use kCGHeadInsertEventTap to run BEFORE Karabiner and other key remappers
+    // This ensures Unshaky filters the original hardware key events
+    eventTap = CGEventTapCreate(kCGSessionEventTap, kCGHeadInsertEventTap, kCGEventTapOptionDefault,
                                 eventMask, eventTapCallback, (__bridge void *)(self));
     if (!eventTap) {
         NSLog(@"Permission issue");
