@@ -14,6 +14,7 @@
 
 @implementation ShakyPressPreventer {
     NSTimeInterval lastPressedTimestamps[N_VIRTUAL_KEY];
+    NSTimeInterval lastKeyDownTimestamps[N_VIRTUAL_KEY];  // Track KeyDown separately
     CGEventType lastPressedEventTypes[N_VIRTUAL_KEY];
 
     CGEventFlags lastEventFlagsAboutModifierKeysForSpace;
@@ -31,6 +32,10 @@
     CFMachPortRef eventTap;
 
     BOOL disabled;
+    
+    // Track the last key that was pressed (any key)
+    CGKeyCode lastPressedKey;
+    NSTimeInterval lastAnyKeyTimestamp;
 }
 
 static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
@@ -56,10 +61,13 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
         [self loadStatisticsDisabled];
         for (int i = 0; i < N_VIRTUAL_KEY; ++i) {
             lastPressedTimestamps[i] = 0.0;
+            lastKeyDownTimestamps[i] = 0.0;
             lastPressedEventTypes[i] = 0;
             dismissNextEvent[i] = NO;
         }
         disabled = NO;
+        lastPressedKey = 0;
+        lastAnyKeyTimestamp = 0.0;
     }
     return self;
 }
@@ -73,9 +81,12 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
         for (int i = 0; i < N_VIRTUAL_KEY; ++i) {
             keyDelays[i] = keyDelays_[i];
             lastPressedTimestamps[i] = 0.0;
+            lastKeyDownTimestamps[i] = 0.0;
             lastPressedEventTypes[i] = 0;
             dismissNextEvent[i] = NO;
         }
+        lastPressedKey = 0;
+        lastAnyKeyTimestamp = 0.0;
     }
     return self;
 }
@@ -228,15 +239,26 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
         }
         
         float msElapsed;
+        // IMPROVED: Check time since last KeyDown, not last KeyUp
+        // This prevents blocking legitimate fast typing where key is held down longer
         if (eventType == kCGEventKeyDown
             && lastPressedEventTypes[keyCode] == kCGEventKeyUp
-            && (msElapsed = 1000 * (currentTimestamp - lastPressedTimestamps[keyCode])) < keyDelays[keyCode]) {
+            && lastKeyDownTimestamps[keyCode] != 0.0
+            && (msElapsed = 1000 * (currentTimestamp - lastKeyDownTimestamps[keyCode])) < keyDelays[keyCode]) {
 
-            // let it slip away if allowance is 1 for CMD+SPACE - improved detection
-            if (keyCode == KEYCODE_SPACE && 
+            // IMPROVEMENT: If a different key was pressed in between, allow this key press
+            // This prevents blocking legitimate typing patterns like "aba", "cdc", etc.
+            BOOL differentKeyPressedInBetween = (lastPressedKey != keyCode) && 
+                                                (lastAnyKeyTimestamp > lastKeyDownTimestamps[keyCode]);
+            
+            if (differentKeyPressedInBetween) {
+                // Allow this key press - it's part of normal typing pattern
+                // Don't dismiss it
+            } else if (keyCode == KEYCODE_SPACE && 
                 (lastEventFlagsAboutModifierKeysForSpace & kCGEventFlagMaskCommand) &&
                 (eventFlagsAboutModifierKeys & kCGEventFlagMaskCommand) && 
                 workaroundForCmdSpace && cmdSpaceAllowance) {
+                // let it slip away if allowance is 1 for CMD+SPACE - improved detection
                 cmdSpaceAllowance = NO;
             } else {
                 // dismiss the keydown event if it follows keyup event too soon
@@ -261,6 +283,13 @@ static NSDictionary<NSNumber *, NSString *> *_keyCodeToString;
     lastPressedTimestamps[keyCode] = currentTimestamp;
     lastPressedEventTypes[keyCode] = eventType;
     if (keyCode == KEYCODE_SPACE) lastEventFlagsAboutModifierKeysForSpace = eventFlagsAboutModifierKeys;
+    
+    // Track the last key pressed globally for improved filtering
+    if (eventType == kCGEventKeyDown) {
+        lastPressedKey = keyCode;
+        lastAnyKeyTimestamp = currentTimestamp;
+        lastKeyDownTimestamps[keyCode] = currentTimestamp;  // Track KeyDown time separately
+    }
     
     return event;
 }
